@@ -1,0 +1,473 @@
+```
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>Stroop Effect Task by IKPARK</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; text-align: center; margin-top: 20px; background-color: #f4f4f9; color: #333; }
+    h1, h2, h3 { color: #444; }
+    
+    /* 리더보드 */
+    #leaderboard {
+      position: fixed; top: 15px; left: 15px; width: 220px;
+      padding: 15px; border: 1px solid #ddd; border-radius: 12px;
+      background-color: #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 100;
+      text-align: left;
+    }
+    #leaderboard h2 { margin: 0 0 10px 0; font-size: 1.1em; color: #007bff; text-align: center; }
+    #leaderboard p { font-size: 0.8em; color: #666; margin-bottom: 8px; line-height: 1.4; background: #f8f9fa; padding: 8px; border-radius: 6px; }
+    #rankings { padding-left: 20px; margin: 0; font-size: 0.9em; }
+    #rankings li { margin-bottom: 4px; border-bottom: 1px dashed #eee; padding-bottom: 2px; }
+
+    /* 메인 컨테이너 */
+    .container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+
+    /* 설정 화면 입력폼 */
+    .input-group { margin: 15px 0; text-align: left; padding: 0 20px; }
+    .input-group label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; }
+    .input-group input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 1em; }
+    
+    /* 안내 화면 */
+    .instruction-screen { display: none; padding: 40px 20px; }
+    .press-space { margin-top: 30px; padding: 15px; background-color: #e2e6ea; color: #004085; border-radius: 8px; font-weight: bold; animation: blink 1.5s infinite; }
+    @keyframes blink { 0% {opacity: 1;} 50% {opacity: 0.5;} 100% {opacity: 1;} }
+
+    /* 버튼 */
+    button { font-size: 1.1em; padding: 12px 24px; background-color: #007bff; color: white; border: none; border-radius: 8px; cursor: pointer; transition: 0.2s; margin: 5px; font-weight: bold; }
+    button:hover { background-color: #0056b3; transform: translateY(-2px); }
+    .btn-download { background-color: #28a745; text-decoration: none; display: inline-block; padding: 12px 20px; color: white; border-radius: 8px; font-size: 1em; font-weight: bold; margin-top: 10px;}
+    .btn-restart { background-color: #6c757d; }
+    
+    /* 실험 화면 요소 */
+    #status-bar { font-size: 1.2em; color: #007bff; margin-bottom: 20px; font-weight: bold; background: #e9ecef; display: inline-block; padding: 5px 15px; border-radius: 20px; }
+    #guide-msg { color: #666; font-size: 1.1em; margin-bottom: 30px; min-height: 1.2em; }
+    
+    #stimulus { font-size: 5em; margin: 40px 0; font-weight: bold; height: 120px; line-height: 120px; }
+    #fixation { font-size: 4em; color: #aaa; height: 120px; line-height: 120px; }
+    #feedback { font-size: 1.5em; margin: 20px; height: 1.5em; font-weight: bold; }
+
+    /* 결과 화면 */
+    .chart-container { position: relative; height: 350px; width: 100%; margin-top: 30px; margin-bottom: 30px; }
+  </style>
+</head>
+<body>
+
+  <div id="leaderboard">
+    <h2>🏆 명예의 전당</h2>
+    <p>
+      🎯 <strong>등록 기준</strong><br>
+      1. 본 시행 정답률 90% 이상<br>
+      2. '불일치 조건' 반응속도 순
+    </p>
+    <ol id="rankings"><li>로딩 중...</li></ol>
+  </div>
+
+  <div id="setup" class="container">
+    <h1>🧠 스트룹 효과 실험</h1>
+    <div style="text-align: left; background: #f1f3f5; padding: 15px; border-radius: 8px; margin-bottom: 20px; color: #495057; font-size: 0.95em;">
+      <strong>[실험 방법]</strong><br>
+      화면에 나타나는 글자의 <strong>'색상'</strong>에 해당하는 키보드 숫자를 빠르게 누르세요.<br>
+      (🔵파랑: 1, 🔴빨강: 2, 🟢초록: 3)<br><br>
+      ✨ <strong>Tip:</strong> 글자의 의미(텍스트)에 속지 말고 색깔에만 집중하세요!
+    </div>
+
+    <div class="input-group">
+      <label>참가자 이름</label>
+      <input type="text" id="name" value="홍길동" placeholder="이름을 입력하세요">
+    </div>
+    <div class="input-group">
+      <label>연습 시행 횟수</label>
+      <input type="number" id="practiceCount" value="5" min="0">
+    </div>
+    <div class="input-group">
+      <label>본 시행 횟수</label>
+      <input type="number" id="mainCount" value="30" min="10">
+    </div>
+
+    <div class="press-space">⌨️ 설정을 마치면 스페이스바를 누르세요</div>
+  </div>
+
+  <div id="intro-practice" class="container instruction-screen">
+    <h2>🐣 연습 단계</h2>
+    <p>본격적인 실험 전에 연습을 진행합니다.<br>결과는 기록되지 않습니다.</p>
+    <div class="press-space">⌨️ 준비되었으면 스페이스바를 누르세요</div>
+  </div>
+
+  <div id="intro-main" class="container instruction-screen">
+    <h2>🔥 본 시행 단계</h2>
+    <p>
+      이제 실제 측정을 시작합니다.<br>
+      <strong>최대한 빠르고 정확하게</strong> 반응해주세요.<br>
+      (정답률 90% 이상 시 리더보드 등록)
+    </p>
+    <div class="press-space">⌨️ 준비되었으면 스페이스바를 누르세요</div>
+  </div>
+
+  <div id="experiment" class="container" style="display:none;">
+    <div id="status-bar">준비 중...</div>
+    <div id="guide-msg">화면의 십자(+) 표시에 집중하세요.</div>
+    
+    <div id="fixation">+</div>
+    <div id="stimulus" style="display:none;"></div>
+    <div id="feedback"></div>
+  </div>
+
+  <div id="result" class="container" style="display:none;">
+    </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getDatabase, ref, push, query, orderByChild, limitToFirst, onValue, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDE1RK1qTWlJuB02WuhMdpflT1q8MrsK94",
+      authDomain: "stroop-leaderboard.firebaseapp.com",
+      databaseURL: "https://stroop-leaderboard-default-rtdb.firebaseio.com",
+      projectId: "stroop-leaderboard",
+      storageBucket: "stroop-leaderboard.appspot.com",
+      messagingSenderId: "166427425163",
+      appId: "1:166427425163:web:59e0b1f87693a86dc3578e"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const leaderboardRef = ref(db, 'leaderboard');
+
+    // --- 변수 ---
+    const words = ["파랑","빨강","초록"];
+    const colors = ["blue","red","green"];
+    const controlSymbol = "◆"; 
+    
+    let name = "";
+    let practiceTrials = 5;
+    let mainTrials = 30;
+    
+    // 상태 관리: setup -> intro-practice -> practice -> intro-main -> main -> result
+    let currentScreen = "setup"; 
+    
+    let currentSequence = [];
+    let currentTrialIndex = 0;
+    let mainResults = []; 
+    let startTime = 0;
+
+    // --- 화면 전환 함수 ---
+    function showScreen(screenId) {
+      const screens = ["setup", "intro-practice", "intro-main", "experiment", "result"];
+      screens.forEach(id => {
+        document.getElementById(id).style.display = (id === screenId) ? "block" : "none";
+      });
+      currentScreen = screenId;
+    }
+
+    // --- 실험 로직 ---
+
+    // 1. 설정 완료 -> 연습 안내 이동
+    function confirmSetup() {
+      name = document.getElementById("name").value.trim();
+      practiceTrials = parseInt(document.getElementById("practiceCount").value);
+      mainTrials = parseInt(document.getElementById("mainCount").value);
+
+      if (!name) return alert("이름을 입력해주세요!");
+
+      if (practiceTrials > 0) {
+        showScreen("intro-practice");
+      } else {
+        showScreen("intro-main");
+      }
+    }
+
+    // 2. 연습 시작
+    function startPractice() {
+      currentSequence = generateSequence(practiceTrials);
+      currentTrialIndex = 0;
+      showScreen("experiment");
+      updateStatusBar("practice");
+      showReady();
+    }
+
+    // 3. 본시행 시작
+    function startMain() {
+      currentSequence = generateSequence(mainTrials);
+      currentTrialIndex = 0;
+      mainResults = [];
+      showScreen("experiment");
+      updateStatusBar("main");
+      showReady();
+    }
+
+    // 시퀀스 생성
+    function generateSequence(count) {
+      let seq = [];
+      for (let i = 0; i < count; i++) {
+        const type = Math.floor(Math.random() * 3);
+        let word, color, cond;
+        
+        if (type === 0) { // 일치
+          const idx = Math.floor(Math.random() * 3);
+          word = words[idx]; color = colors[idx]; cond = "congruent";
+        } else if (type === 1) { // 불일치
+          const wIdx = Math.floor(Math.random() * 3);
+          let cIdx = Math.floor(Math.random() * 3);
+          while(wIdx === cIdx) cIdx = Math.floor(Math.random() * 3);
+          word = words[wIdx]; color = colors[cIdx]; cond = "incongruent";
+        } else { // 통제
+          word = controlSymbol; color = colors[Math.floor(Math.random() * 3)]; cond = "neutral";
+        }
+        seq.push({ word, color, condition: cond });
+      }
+      return seq;
+    }
+
+    function updateStatusBar(phase) {
+      const statusDiv = document.getElementById("status-bar");
+      const total = phase === "practice" ? practiceTrials : mainTrials;
+      const current = currentTrialIndex + 1;
+      
+      if (phase === "practice") {
+        statusDiv.innerText = `🐣 연습 단계 (${current} / ${total})`;
+        statusDiv.style.backgroundColor = "#fff3cd"; 
+        statusDiv.style.color = "#856404";
+      } else {
+        statusDiv.innerText = `🔥 본 시행 (${current} / ${total})`;
+        statusDiv.style.backgroundColor = "#e9ecef";
+        statusDiv.style.color = "#007bff";
+      }
+    }
+
+    function showReady() {
+      document.getElementById("stimulus").style.display = "none";
+      document.getElementById("feedback").style.display = "none";
+      const fix = document.getElementById("fixation");
+      fix.style.display = "block";
+      document.getElementById("guide-msg").innerText = "십자(+)를 응시하세요.";
+
+      setTimeout(runTrial, 1000); 
+    }
+
+    function runTrial() {
+      document.getElementById("fixation").style.display = "none";
+      
+      const trial = currentSequence[currentTrialIndex];
+      const stim = document.getElementById("stimulus");
+      
+      stim.innerText = trial.word;
+      stim.style.color = trial.color;
+      stim.style.display = "block";
+      
+      document.getElementById("guide-msg").innerText = "글자의 '색깔' 번호를 누르세요!";
+
+      startTime = performance.now();
+      document.addEventListener("keydown", handleResponse, { once: true });
+    }
+
+    function handleResponse(e) {
+      // 숫자키 입력만 허용 등 필터링이 필요할 수 있으나 단순화함
+      const rt = performance.now() - startTime;
+      const trial = currentSequence[currentTrialIndex];
+      
+      const correctKey = (colors.indexOf(trial.color) + 1).toString();
+      // 유효 키 확인 (1,2,3)
+      if (!['1','2','3'].includes(e.key)) {
+        // 잘못된 키 입력 시 재입력 대기하려면 여기서 return하고 리스너 다시 등록해야 함.
+        // 여기서는 오답 처리로 진행
+      }
+
+      const isCorrect = (e.key === correctKey);
+
+      // 본 시행일 때만 저장
+      if (currentScreen === "experiment" && document.getElementById("status-bar").innerText.includes("본 시행")) {
+        mainResults.push({
+          participant: name, // 분석용: 참가자 이름 추가
+          date: new Date().toISOString().split('T')[0], // 분석용: 날짜
+          trial: currentTrialIndex + 1,
+          condition: trial.condition,
+          word: trial.word,
+          color: trial.color,
+          response: e.key,
+          correct: isCorrect,
+          rt: rt
+        });
+      }
+
+      showFeedback(isCorrect, rt);
+    }
+
+    function showFeedback(isCorrect, rt) {
+      const fb = document.getElementById("feedback");
+      const stim = document.getElementById("stimulus");
+      stim.style.display = "none";
+      fb.style.display = "block";
+
+      if (isCorrect) {
+        fb.innerHTML = `<span style="color:green">⭕ 정답</span>`;
+      } else {
+        fb.innerHTML = `<span style="color:red">❌ 오답</span>`;
+      }
+
+      setTimeout(() => {
+        currentTrialIndex++;
+        const isPractice = document.getElementById("status-bar").innerText.includes("연습");
+        const total = isPractice ? practiceTrials : mainTrials;
+
+        if (currentTrialIndex < total) {
+          updateStatusBar(isPractice ? "practice" : "main");
+          showReady();
+        } else {
+          // 단계 종료
+          if (isPractice) {
+            showScreen("intro-main");
+          } else {
+            finishExperiment();
+          }
+        }
+      }, 800); 
+    }
+
+    function finishExperiment() {
+      showScreen("result");
+      const resDiv = document.getElementById("result");
+      
+      const correctArr = mainResults.filter(r => r.correct);
+      const accuracy = correctArr.length / mainTrials;
+      const score = Math.round(accuracy * 100);
+
+      processLeaderboard(accuracy);
+
+      let html = `<h2>👏 실험 종료! 수고하셨습니다.</h2>`;
+      html += `<p style="font-size:1.2em;">참가자: <strong>${name}</strong> | 정답률: <strong>${score}%</strong></p>`;
+
+      if (accuracy >= 0.9) {
+        html += `<div style="background:#d4edda; color:#155724; padding:10px; border-radius:5px;">🎉 리더보드 등록 완료!</div>`;
+      } else {
+         html += `<div style="background:#f8d7da; color:#721c24; padding:10px; border-radius:5px;">아쉽게도 정답률 90% 미만입니다.</div>`;
+      }
+
+      // 그래프 영역
+      html += `<div class="chart-container"><canvas id="resultChart"></canvas></div>`;
+
+      // 버튼 (상세 테이블은 제거함)
+      html += `
+        <div>
+          <a id="csvLink" href="#" class="btn-download">💾 분석용 데이터 저장 (.csv)</a><br><br>
+          <button onclick="location.reload()" class="btn-restart">🔄 처음으로 돌아가기</button>
+        </div>
+      `;
+      
+      resDiv.innerHTML = html;
+
+      renderChart();
+      createCsv();
+    }
+
+    function renderChart() {
+      const types = ['congruent', 'incongruent', 'neutral'];
+      const stats = types.map(type => {
+        const filtered = mainResults.filter(r => r.condition === type && r.correct);
+        const avg = filtered.length ? filtered.reduce((a,b)=>a+b.rt,0)/filtered.length : 0;
+        return avg;
+      });
+
+      const ctx = document.getElementById('resultChart').getContext('2d');
+      new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: ['일치 조건', '불일치 조건', '통제 조건'],
+          datasets: [{
+            label: '평균 반응시간 (ms) - 정답 시행만',
+            data: stats,
+            backgroundColor: ['#36a2eb', '#ff6384', '#4bc0c0']
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: { y: { beginAtZero: true, title: {display:true, text:'반응시간 (ms)'} } }
+        }
+      });
+    }
+
+    function createCsv() {
+      // 분석에 필요한 항목들 포함 (참가자명, 날짜 등)
+      const header = ["participant", "date", "phase", "trial_no", "condition", "word_text", "color_text", "response_key", "accuracy(0/1)", "rt_ms"].join(",");
+      let body = "";
+      
+      mainResults.forEach(r => {
+        body += [
+          r.participant,
+          r.date,
+          "Main",
+          r.trial,
+          r.condition,
+          r.word,
+          r.color,
+          r.response,
+          r.correct ? 1 : 0, // 분석 시 숫자가 편함
+          Math.round(r.rt)
+        ].join(",") + "\n";
+      });
+      
+      const blob = new Blob(['\uFEFF' + header + "\n" + body], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.getElementById("csvLink");
+      link.href = url;
+      link.download = `Stroop_${name}_${new Date().getTime()}.csv`;
+    }
+
+    function processLeaderboard(accuracy) {
+      if (accuracy < 0.9) return;
+      const incCorrect = mainResults.filter(r => r.condition === 'incongruent' && r.correct);
+      if (incCorrect.length > 0) {
+        const avgRt = Math.round(incCorrect.reduce((a,b)=>a+b.rt,0) / incCorrect.length);
+        push(leaderboardRef, { name: name, score: avgRt, timestamp: serverTimestamp() });
+      }
+    }
+
+    function displayLeaderboard() {
+      const list = document.getElementById("rankings");
+      onValue(query(leaderboardRef, orderByChild('score'), limitToFirst(10)), (snap) => {
+        list.innerHTML = "";
+        if(snap.exists()){
+          snap.forEach(c => {
+            const d = c.val();
+            const li = document.createElement("li");
+            li.innerHTML = `<strong>${d.score}ms</strong> <span style="color:#555">(${d.name})</span>`;
+            list.appendChild(li);
+          });
+        } else {
+          list.innerHTML = "<li>기록 없음</li>";
+        }
+      });
+    }
+
+    // 전역 키보드 리스너 (스페이스바 처리용)
+    document.addEventListener('keydown', (e) => {
+      if (e.code !== 'Space') return;
+      if (currentScreen === "experiment") return; // 실험 중엔 반응키만 작동
+
+      // Input 입력 중엔 스페이스바 허용
+      if (e.target.tagName === 'INPUT') return;
+
+      e.preventDefault(); 
+
+      if (currentScreen === "setup") {
+        confirmSetup();
+      } else if (currentScreen === "intro-practice") {
+        startPractice();
+      } else if (currentScreen === "intro-main") {
+        startMain();
+      }
+    });
+
+    displayLeaderboard();
+  </script>
+</body>
+</html>
+```
+
+##
+
+##
+
+svg
